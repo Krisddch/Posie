@@ -18,6 +18,7 @@
 
   const state = {
     enabled: Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey),
+    apple: Boolean(cfg.appleSignIn),
     user: null,
     status: 'idle',   // idle | syncing | synced | error
     lastSync: 0,
@@ -26,6 +27,7 @@
   const setStatus = (s) => { state.status = s; if (s === 'synced') state.lastSync = Date.now(); notify(); };
 
   let sb = null;
+  let sdkReady = null;
   const appReady = new Promise((r) => document.addEventListener('posie:ready', r, { once: true }));
 
   app.account = {
@@ -38,6 +40,15 @@
       });
       if (error) { console.warn('posie: sign-in failed', error); setStatus('error'); }
     },
+    // free alternative to Apple: a one-tap sign-in link sent by email
+    async signInWithEmail(email) {
+      if (!sb) return { error: 'sync is not connected yet' };
+      const { error } = await sb.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: location.origin + location.pathname },
+      });
+      return { error: error ? error.message : null };
+    },
     async signOut() {
       if (!sb) return;
       await sb.auth.signOut();
@@ -46,6 +57,15 @@
   };
 
   if (!state.enabled) return;
+
+  // link previews for shared links (a Pinterest pin → its picture, title and page), via supabase/functions/unfurl
+  app.unfurl = async (url) => {
+    await sdkReady;
+    if (!sb) return null;
+    const { data, error } = await sb.functions.invoke('unfurl', { body: { url } });
+    if (error) throw error;
+    return data;
+  };
 
   const loadScript = (src) => new Promise((resolve, reject) => {
     const s = document.createElement('script');
@@ -205,7 +225,7 @@
   window.addEventListener('focus', syncOnReturn);
 
   /* ---------------- start ---------------- */
-  loadScript(SDK)
+  sdkReady = loadScript(SDK)
     .then(() => {
       sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },

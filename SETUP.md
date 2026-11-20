@@ -1,19 +1,23 @@
-# Turning on "Sign in with Apple" + sync
+# Turning on sync (email link, and later Sign in with Apple)
 
-Posie works fully without an account. Sync needs two things only you can create:
-an **Apple Developer account** (for Sign in with Apple) and a free **Supabase** project
-(it stores your boards and handles the Apple login).
+Posie works fully without an account. To sync between devices you need a free **Supabase** project.
+Signing in by **email link** is free and works as soon as Supabase is set up.
+**Sign in with Apple** is optional and needs the paid Apple Developer Program ($99/year); set
+`appleSignIn: true` in `config.js` once it's configured.
 
 ## 1. Supabase (≈5 min)
 
 1. Create a project at https://supabase.com (free tier is fine).
 2. **SQL Editor** → paste [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
-3. **Project Settings → API**: copy the **Project URL** and the **anon public** key into [`config.js`](config.js).
+3. **Project Settings → API Keys**: copy the **anon / publishable** key into [`config.js`](config.js) (the URL is already there).
 4. **Authentication → URL Configuration**:
    - Site URL: `https://krisddch.github.io/Posie/`
    - Redirect URLs: add `https://krisddch.github.io/Posie/` and `http://localhost:5173/`
 
-## 2. Apple (Sign in with Apple)
+Email sign-in now works (Supabase sends the emails; the free plan allows a few per hour, plenty for personal use).
+For one-tap sharing from Pinterest, also deploy the link-preview function: see [SHARE.md](SHARE.md).
+
+## 2. Apple (optional: Sign in with Apple, paid program only)
 
 Go straight to https://developer.apple.com/account/resources/identifiers/list (or: developer.apple.com → person icon top-right → **Account** → **Certificates, Identifiers & Profiles**). If you only see "Join the Apple Developer Program", your membership is still being processed (it can take up to 48 hours).
 Do Supabase step 1 first: you need your project address (`arnpmovrwyceifulfmzd.supabase.co`) below.

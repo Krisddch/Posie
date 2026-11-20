@@ -285,7 +285,7 @@
       title: '', note: '', link: '', source: '', album: null,
       createdAt: Date.now(),
       w,
-      rot: +(type === 'album' ? rand(-2, 2) : rand(-4, 4)).toFixed(2),
+      rot: type === 'album' ? 0 : +rand(-4, 4).toFixed(2),
       tape: type === 'image' && Math.random() < 0.45,
       z: ++topZ,
       ...data,
@@ -1059,10 +1059,27 @@
         <p class="acct-mark">posie</p>
         <p class="acct-title">keep your board everywhere</p>
         <p class="acct-sub">sign in to sync your pins and albums between your phone and your computer.</p>
-        <button class="apple-btn" data-act="signin" ${s.enabled ? '' : 'disabled'}>${APPLE}<span>Sign in with Apple</span></button>
-        ${s.enabled ? '' : '<p class="acct-note">sync isn’t connected yet (see SETUP.md)</p>'}`;
+        ${s.apple ? `<button class="apple-btn" data-act="signin">${APPLE}<span>Sign in with Apple</span></button><p class="acct-or">or</p>` : ''}
+        <form class="acct-email">
+          <input type="email" name="email" required autocomplete="email" placeholder="your email" ${s.enabled ? '' : 'disabled'}>
+          <button type="submit" ${s.enabled ? '' : 'disabled'}>email me a sign-in link</button>
+        </form>
+        <p class="acct-note">${s.enabled ? 'no password, just tap the link we send you' : 'sync isn’t connected yet (see SETUP.md)'}</p>`;
     }
   }
+  acct.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const note = acct.querySelector('.acct-note');
+    const email = form.email.value.trim();
+    if (!email || !window.posie.account?.signInWithEmail) return;
+    form.querySelector('button').disabled = true;
+    note.textContent = 'sending…';
+    const { error } = await window.posie.account.signInWithEmail(email);
+    note.textContent = error ? `couldn’t send: ${error}` : `check ${email}, then tap the link to sign in ✉︎`;
+    note.classList.toggle('error', Boolean(error));
+    form.querySelector('button').disabled = false;
+  });
   acct.addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'signin') window.posie.account?.signIn();
@@ -1124,6 +1141,45 @@
     },
   };
 
+  /* ---------------- toast ---------------- */
+  let toastEl = null;
+  let toastTimer = null;
+  function toast(text) {
+    if (!toastEl) { toastEl = document.createElement('div'); toastEl.className = 'toast'; document.body.append(toastEl); }
+    toastEl.textContent = text;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+  }
+
+  /* ---------------- shared from another app ----------------
+   * Posie accepts  ?add=<link>  (iPhone Shortcut) and  ?url=&text=&title=  (Android share sheet).
+   * A shared Pinterest pin becomes its picture, titled, with a link back to the pin.
+   */
+  async function intakeShare() {
+    const q = new URLSearchParams(location.search);
+    const raw = [q.get('add'), q.get('url'), q.get('text')].filter(Boolean).join(' ');
+    const title = (q.get('title') || '').trim();
+    if (!raw && !title) return;
+    history.replaceState(null, '', location.pathname);   // so a reload doesn't add it twice
+
+    const url = (raw.match(/https?:\/\/\S+/) || [])[0] || '';
+    const text = raw.replace(url, '').trim();
+    const at = toWorld(innerWidth / 2 + rand(-60, 60), innerHeight / 2 + rand(-50, 50));
+    toast('adding to your board…');
+
+    if (!url) { addNote({ text: text || title }, at); toast('added to your board ✓'); return; }
+
+    let info = null;
+    try { info = await window.posie.unfurl?.(url); } catch (e) { console.warn('posie: link preview failed', e); }
+    const page = info?.url || url;
+    const name = (title || info?.title || '').slice(0, 120);
+    if (info?.image && await addRemoteImage(info.image, at, { link: page, title: name })) { toast('added to your board ✓'); return; }
+    if (await addRemoteImage(url, at, { title: name })) { toast('added to your board ✓'); return; }
+    addNote({ link: page, title: name, text }, at);
+    toast('saved the link to your board ✓');
+  }
+
   /* ---------------- start ---------------- */
   applyCam();
   db.all()
@@ -1133,7 +1189,8 @@
       for (const item of list) render(item.id);
     })
     .catch((e) => console.warn('posie: could not load board', e))
-    .finally(() => { updateHint(); document.dispatchEvent(new Event('posie:ready')); });
+    .finally(() => { updateHint(); document.dispatchEvent(new Event('posie:ready')); setTimeout(intakeShare, 0); });
 
   navigator.storage?.persist?.().catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

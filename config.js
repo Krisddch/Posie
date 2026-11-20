@@ -4,5 +4,6 @@
  */
 window.POSIE_CONFIG = {
   supabaseUrl: 'https://arnpmovrwyceifulfmzd.supabase.co',
-  supabaseAnonKey: '',  // Project Settings → API → anon public key
+  supabaseAnonKey: '',  // Project Settings → API Keys → anon / publishable key
+  appleSignIn: false,   // turn on once Sign in with Apple is set up (needs the paid Apple Developer Program)
 };
