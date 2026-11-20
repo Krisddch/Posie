@@ -97,19 +97,20 @@
   const imagePath = (id) => `${state.user.id}/${id}`;
   const stamp = (item) => new Date(item.updatedAt || item.createdAt || Date.now()).toISOString();
 
+  // upload the picture's actual bytes; an unreadable or empty picture is never uploaded
+  async function uploadImage(item) {
+    const bytes = await item.blob.arrayBuffer().catch(() => null);
+    if (!bytes || !bytes.byteLength) return false;
+    const type = item.blob.type || 'image/jpeg';
+    const { error } = await sb.storage.from('pins').upload(imagePath(item.id), new Blob([bytes], { type }), { upsert: true, contentType: type });
+    if (error) throw error;
+    remoteImages.add(item.id);
+    return true;
+  }
+
   async function pushItem(item) {
-    let image_path = null;
-    if (item.blob) {
-      image_path = imagePath(item.id);
-      if (!remoteImages.has(item.id)) {
-        const { error } = await sb.storage.from('pins').upload(image_path, item.blob, {
-          upsert: true,
-          contentType: item.blob.type || 'image/webp',
-        });
-        if (error) throw error;
-        remoteImages.add(item.id);
-      }
-    }
+    let image_path = remoteImages.has(item.id) ? imagePath(item.id) : null;
+    if (item.blob?.size && !remoteImages.has(item.id) && await uploadImage(item)) image_path = imagePath(item.id);
     const { blob, ...data } = item;
     const { error } = await sb.from('pins').upsert({
       user_id: state.user.id,
@@ -139,9 +140,13 @@
 
   async function download(path) {
     const { data, error } = await sb.storage.from('pins').download(path);
-    if (error) throw error;
-    return data;
+    if (error || !data || !data.size) return null;   // missing or empty: keep whatever we have
+    return new Blob([await data.arrayBuffer()], { type: data.type || 'image/jpeg' });
   }
+
+  // one time after the empty-picture fix: every device re-uploads the pictures it still has
+  const REPAIR = 'posie.pictures-repaired.v1';
+  const needsRepair = () => { try { return !localStorage.getItem(REPAIR); } catch { return false; } };
 
   /* ---------------- full merge ---------------- */
   let syncing = false;
@@ -181,11 +186,27 @@
 
         if (!mine || theirs > ours) {
           const item = { ...r.data, updatedAt: theirs };
-          if (r.image_path) item.blob = mine?.blob || await download(r.image_path);
+          if (r.image_path) {
+            const pic = mine?.blob?.size ? mine.blob : await download(r.image_path);
+            if (pic) item.blob = pic;
+          }
           app.applyRemote(item);
         } else if (ours > theirs) {
           await pushItem(mine);
+        } else if (r.image_path && !mine.blob?.size) {
+          // this device lost the picture: fetch it again
+          const pic = await download(r.image_path);
+          if (pic) app.applyRemote({ ...mine, blob: pic });
         }
+      }
+
+      if (needsRepair()) {
+        for (const item of app.all()) {
+          if (item.blob?.size && seen.has(item.id) && await uploadImage(item)) {
+            await sb.from('pins').update({ image_path: imagePath(item.id) }).eq('user_id', state.user.id).eq('id', item.id);
+          }
+        }
+        try { localStorage.setItem(REPAIR, '1'); } catch {}
       }
       for (const item of local.values()) if (!seen.has(item.id)) await pushItem(item);
       for (const id of tombs) if (!seen.has(id)) app.clearTombstone(id);

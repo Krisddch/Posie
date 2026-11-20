@@ -249,7 +249,8 @@
       img.alt = item.title || '';
       if (item.iw && item.ih) img.style.aspectRatio = `${item.iw} / ${item.ih}`;
       img.onerror = () => el.classList.add('broken');
-      img.src = srcOf(item);
+      const src = srcOf(item);
+      if (!src) el.classList.add('broken'); else img.src = src;
       el.append(img);
     } else if (item.type === 'note') {
       el.style.background = item.color;
@@ -425,31 +426,78 @@
   }
 
   /* ---------------- adding things ---------------- */
-  async function prepare(blob) {
-    // Keep a reasonably sized copy so the board stays fast and storage stays small.
-    let bmp;
-    try { bmp = await createImageBitmap(blob); } catch { return { blob, w: 4, h: 5 }; }
-    const { width: w, height: h } = bmp;
-    const MAX = 1600;
-    if (blob.type === 'image/gif' || (Math.max(w, h) <= MAX && blob.size < 1.2e6)) {
-      bmp.close?.();
-      return { blob, w, h };
+  // A picture is always stored as its own bytes, never as a reference to a file on disk:
+  // Safari can lose access to such references later, which left empty (0-byte) pictures.
+  async function toMemoryBlob(blob, type) {
+    const buf = await blob.arrayBuffer();
+    if (!buf.byteLength) throw new Error('empty picture');
+    return new Blob([buf], { type: type || blob.type || 'image/jpeg' });
+  }
+  const loadImg = (url) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+  const canvasBlob = (canvas, type, q) => new Promise((r) => canvas.toBlob(r, type, q));
+
+  async function prepare(input) {
+    let blob;
+    try { blob = await toMemoryBlob(input); } catch { return null; }
+    let source = null;
+    let w = 0;
+    let h = 0;
+    try { source = await createImageBitmap(blob); w = source.width; h = source.height; } catch {}
+    let url = null;
+    if (!source) {
+      url = URL.createObjectURL(blob);
+      source = await loadImg(url);
+      if (!source) { URL.revokeObjectURL(url); return { blob, w: 4, h: 5 }; }
+      w = source.naturalWidth;
+      h = source.naturalHeight;
     }
-    const k = Math.min(1, MAX / Math.max(w, h));
-    const cw = Math.round(w * k);
-    const ch = Math.round(h * k);
-    const canvas = document.createElement('canvas');
-    canvas.width = cw;
-    canvas.height = ch;
-    canvas.getContext('2d').drawImage(bmp, 0, 0, cw, ch);
-    bmp.close?.();
-    const out = await new Promise((r) => canvas.toBlob(r, 'image/webp', 0.86));
-    return { blob: out || blob, w: cw, h: ch };
+    const MAX = 1600;
+    const keep = blob.type === 'image/gif'
+      || (Math.max(w, h) <= MAX && blob.size < 1.2e6 && /^image\/(jpeg|png|webp)$/.test(blob.type));
+    if (!keep) {
+      // keep a reasonably sized copy so the board stays fast and storage stays small
+      const k = Math.min(1, MAX / Math.max(w, h));
+      const cw = Math.round(w * k);
+      const ch = Math.round(h * k);
+      const canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      canvas.getContext('2d').drawImage(source, 0, 0, cw, ch);
+      let out = await canvasBlob(canvas, 'image/webp', 0.86);
+      if (!out || out.type !== 'image/webp') out = await canvasBlob(canvas, 'image/jpeg', 0.88);   // Safari can't make webp
+      if (out && out.size) { blob = out; w = cw; h = ch; }
+    }
+    source.close?.();
+    if (url) URL.revokeObjectURL(url);
+    return { blob, w, h };
   }
 
   async function addImageBlob(blob, at, extra = {}) {
     const p = await prepare(blob);
+    if (!p) { toast('couldn’t read that picture. Try saving it first, then add it'); return null; }
     return create({ type: 'image', blob: p.blob, iw: p.w, ih: p.h, ...extra }, at);
+  }
+
+  // pictures saved before this fix may be file references: copy them into memory while they're still readable
+  async function healPictures() {
+    for (const item of items.values()) {
+      if (!item.blob) continue;
+      try {
+        item.blob = await toMemoryBlob(item.blob);
+        db.put(item);
+      } catch {
+        console.warn('posie: picture unreadable on this device', item.id);
+        item.blob = null;
+        db.put(item);
+        render(item.id);
+        if (item.album) render(item.album);
+      }
+    }
   }
 
   async function addRemoteImage(url, at, extra = {}) {
@@ -1271,6 +1319,7 @@
     // apply a pin/album that changed on another device (no echo back to the cloud)
     applyRemote(item) {
       const prev = items.get(item.id);
+      if (!item.blob?.size && prev?.blob?.size) item.blob = prev.blob;   // never trade a good picture for an empty one
       items.set(item.id, item);
       topZ = Math.max(topZ, item.z || 1);
       db.put(item);
@@ -1306,7 +1355,7 @@
       for (const item of list) render(item.id);
     })
     .catch((e) => console.warn('posie: could not load board', e))
-    .finally(() => { updateHint(); document.dispatchEvent(new Event('posie:ready')); setTimeout(intakeShare, 0); });
+    .finally(async () => { await healPictures(); updateHint(); document.dispatchEvent(new Event('posie:ready')); setTimeout(intakeShare, 0); });
 
   navigator.storage?.persist?.().catch(() => {});
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
