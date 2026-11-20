@@ -15,15 +15,17 @@
   const menu = $id('menu');
   const accountModal = $id('account');
 
+  // album colors + a deeper shade of each for depth (never muddied toward grey)
   const PALETTE = [
-    { name: 'sky', hex: '#75A1EE' },
-    { name: 'butter', hex: '#FDE575' },
-    { name: 'blossom', hex: '#F890C5' },
-    { name: 'cocoa', hex: '#733D20' },
+    { name: 'sky', hex: '#75A1EE', deep: '#3F6FD0' },
+    { name: 'butter', hex: '#FDE575', deep: '#F2C230' },
+    { name: 'blossom', hex: '#F890C5', deep: '#E35A9F' },
+    { name: 'cocoa', hex: '#733D20', deep: '#4A230F' },
   ];
+  const shade = (hex) => PALETTE.find((p) => p.hex.toLowerCase() === String(hex).toLowerCase())?.deep || hex;
   const MAGNETS = ['#efe2cf', '#1f3a7a', '#cdb0bd', '#5b2a52', '#a3201c', '#f4ecd9', '#f2cd2e', '#a9bfc4', '#c89a74'];
   const NOTE_COLORS = ['#fff1bf', '#fde0d8', '#e2ebd3', '#dce7f1', '#ede0f2'];
-  const WIDTH = { image: 220, note: 210, album: 210 };
+  const WIDTH = { image: 220, note: 210, album: 180 };
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -172,37 +174,48 @@
   function fillAlbum(el, item) {
     const color = item.color || PALETTE[0].hex;
     el.style.setProperty('--c', color);
+    el.style.setProperty('--deep', shade(color));
     el.classList.toggle('dark', isDark(color));
     const kids = childrenOf(item.id);
-    el.innerHTML = `
-      <div class="folder-back"></div>
-      <div class="folder-peek"></div>
-      <div class="folder-front">
-        <div class="album-count"></div>
-        <div class="album-name"></div>
-        <div class="album-desc"></div>
-      </div>`;
-    const peek = el.querySelector('.folder-peek');
-    kids.slice(0, 3).reverse().forEach((k, i, arr) => {
+    el.querySelector(':scope > .peeks')?.remove();
+    el.querySelector(':scope > .folder')?.remove();
+
+    // contents slide out of the right side; the deepest one sticks out the furthest
+    const peeks = document.createElement('div');
+    peeks.className = 'peeks';
+    const shown = kids.slice(0, 3);
+    if (!shown.length) {
+      const p = document.createElement('div');
+      p.className = 'peek blank';
+      p.style.setProperty('--i', 0);
+      peeks.append(p);
+    }
+    shown.forEach((k, i) => {
       const p = document.createElement('div');
       p.className = 'peek';
-      p.style.setProperty('--i', i + (3 - arr.length));
+      p.style.setProperty('--i', i);
+      p.style.zIndex = 3 - i;
       if (k.type === 'image') {
         const im = new Image();
         im.draggable = false;
         im.src = srcOf(k);
         p.append(im);
       } else {
-        p.classList.add('peek-note');
         p.style.background = k.color || NOTE_COLORS[0];
       }
-      peek.append(p);
+      peeks.append(p);
     });
-    el.querySelector('.album-count').textContent = kids.length ? `${kids.length} ${kids.length === 1 ? 'thing' : 'things'}` : 'empty';
-    const name = el.querySelector('.album-name');
+
+    const folder = document.createElement('div');
+    folder.className = 'folder';
+    folder.innerHTML = '<span class="album-pill"></span><div class="album-name"></div><div class="album-desc"></div>';
+    folder.querySelector('.album-pill').textContent = kids.length ? `${kids.length} ${kids.length === 1 ? 'thing' : 'things'}` : 'empty';
+    const name = folder.querySelector('.album-name');
     name.textContent = item.title || 'untitled album';
     name.classList.toggle('empty', !item.title);
-    el.querySelector('.album-desc').textContent = item.note || '';
+    folder.querySelector('.album-desc').textContent = item.note || '';
+
+    el.prepend(peeks, folder);
   }
 
   function buildCard(item) {
@@ -266,7 +279,7 @@
   function create(data, at) {
     const type = data.type;
     const w = WIDTH[type];
-    const h = type === 'image' ? w * ((data.ih || 5) / (data.iw || 4)) + 14 : type === 'note' ? 170 : 250;
+    const h = type === 'image' ? w * ((data.ih || 5) / (data.iw || 4)) + 14 : type === 'note' ? 170 : 232;
     const item = {
       id: uid(),
       title: '', note: '', link: '', source: '', album: null,
@@ -287,6 +300,7 @@
     if (item.album && items.has(item.album)) {
       render(item.album);
       flash(item.album, 'bump');
+      if (avAlbum?.id === item.album) refreshAlbumView();
     } else {
       render(item.id);
       flash(item.id, 'pop');
@@ -461,7 +475,7 @@
     board.classList.remove('dropping');
     setDropTarget(null);
     if (!modal.hidden || !e.dataTransfer) return;
-    const album = albumAt(e.clientX, e.clientY);
+    const album = avAlbum ? avAlbum.id : albumAt(e.clientX, e.clientY);
     ingest(e.dataTransfer, toWorld(e.clientX, e.clientY), album ? { album } : {});
   });
 
@@ -469,7 +483,7 @@
     if (!modal.hidden || !accountModal.hidden || e.target.closest?.('input, textarea')) return;
     if (!e.clipboardData) return;
     e.preventDefault();
-    ingest(e.clipboardData, toWorld(innerWidth / 2 + rand(-50, 50), innerHeight / 2 + rand(-40, 40)));
+    ingest(e.clipboardData, toWorld(innerWidth / 2 + rand(-50, 50), innerHeight / 2 + rand(-40, 40)), avAlbum ? { album: avAlbum.id } : {});
   });
 
   /* ---------------- double-tap menu ---------------- */
@@ -552,7 +566,7 @@
           if (ev.type === 'pointerup' && items.has(target)) { putInAlbum(item, target); return; }
         }
         if (moved) persist(item);
-        else if (ev.type === 'pointerup' && items.has(id)) openSheet(item);
+        else if (ev.type === 'pointerup' && items.has(id)) (item.type === 'album' ? openAlbumView(item) : openSheet(item));
       };
       el.addEventListener('pointermove', move);
       el.addEventListener('pointerup', end);
@@ -705,7 +719,7 @@
 
   // reflect edits on the board without rebuilding the image
   function reflect(item) {
-    if (item.type === 'album') { render(item.id); return; }
+    if (item.type === 'album') { render(item.id); if (preview) fillAlbum(preview, item); return; }
     const el = views.get(item.id);
     if (el) {
       if (item.type === 'note') el.querySelector('.note-text').textContent = item.text || '';
@@ -715,38 +729,7 @@
     }
   }
 
-  function buildAlbumMedia(album) {
-    media.classList.add('album-media');
-    media.style.setProperty('--c', album.color);
-    const kids = childrenOf(album.id);
-    if (!kids.length) {
-      media.innerHTML = '<div class="album-empty"><b>nothing here yet</b>drag pins onto the folder, or drop pictures right on it</div>';
-      return;
-    }
-    const grid = document.createElement('div');
-    grid.className = 'album-grid';
-    kids.forEach((k) => {
-      const t = document.createElement('div');
-      t.className = 'tile';
-      if (k.type === 'image') {
-        const im = new Image();
-        im.src = srcOf(k);
-        im.alt = k.title || '';
-        t.append(im);
-      } else if (k.text) {
-        t.classList.add('note');
-        t.style.background = k.color;
-        t.textContent = k.text;
-      } else {
-        t.classList.add('note', 'link');
-        t.style.background = k.color;
-        t.textContent = hostOf(k.link) || k.title || 'note';
-      }
-      t.addEventListener('click', () => openSheet(k));
-      grid.append(t);
-    });
-    media.append(grid);
-  }
+  let preview = null; // live folder preview while creating an album
 
   function openSheet(item, { focusTitle = false } = {}) {
     flushSave();
@@ -754,10 +737,19 @@
     current = item;
     const isAlbum = item.type === 'album';
     media.replaceChildren();
-    media.classList.remove('album-media');
+    media.classList.toggle('album-media', isAlbum);
+    preview = null;
 
     if (isAlbum) {
-      buildAlbumMedia(item);
+      media.style.setProperty('--c', item.color);
+      const wrap = document.createElement('div');
+      wrap.className = 'album-preview';
+      preview = document.createElement('div');
+      preview.className = 'card album';
+      preview.style.width = `${WIDTH.album}px`;
+      fillAlbum(preview, item);
+      wrap.append(preview);
+      media.append(wrap);
     } else if (item.type === 'image') {
       const img = new Image();
       img.alt = item.title || '';
@@ -773,22 +765,22 @@
       media.append(ta);
     }
 
-    const parent = item.album && items.get(item.album);
-    fBack.hidden = !parent;
-    if (parent) fBack.textContent = `← ${parent.title || 'untitled album'}`;
+    const inAlbum = Boolean(item.album && items.has(item.album));
+    fBack.hidden = true;
     fTitle.placeholder = isAlbum ? 'album name' : 'give it a name…';
     fNote.placeholder = isAlbum ? 'a short description' : "why do you love it? what's the plan?";
     fTitle.value = item.title || '';
     fNote.value = item.note || '';
+    // colors are offered while creating; later they live behind the tiny circle in the open album
     fSwatches.hidden = !isAlbum;
     fSwatches.querySelectorAll('.swatch').forEach((s) => s.setAttribute('aria-checked', String(s.dataset.hex === item.color)));
     fLinkRow.hidden = isAlbum;
     fLink.value = item.link || '';
     if (!isAlbum) updateVisit();
-    fOut.hidden = !parent;
+    fOut.hidden = !inAlbum;
     fDate.textContent = `${isAlbum ? 'made' : 'added'} ${fmtDate(item.createdAt)}`;
     delete fRemove.dataset.armed;
-    fRemove.textContent = isAlbum ? 'remove album' : 'remove';
+    fRemove.textContent = 'remove';
 
     modal.hidden = false;
     autosize(fNote);
@@ -800,6 +792,7 @@
     if (!current) return;
     flushSave();
     current = null;
+    preview = null;
     modal.classList.remove('open');
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => { modal.hidden = true; media.replaceChildren(); }, 200);
@@ -823,12 +816,11 @@
     el.addEventListener('click', fn);
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
   };
-  onKeyActivate(fBack, () => { const p = current && items.get(current.album); if (p) openSheet(p); });
   onKeyActivate(fOut, () => {
     const item = current;
-    const parent = items.get(item.album);
     takeOut(item);
-    if (parent) openSheet(parent); else closeSheet();
+    closeSheet();
+    refreshAlbumView();
   });
   onKeyActivate(fRemove, () => {
     if (!fRemove.dataset.armed) {
@@ -837,16 +829,212 @@
       return;
     }
     const item = current;
-    const parent = item.album && items.get(item.album);
     flushSave();
     removeItem(item);
-    current = null;
-    if (parent) openSheet(parent); else { current = item; closeSheet(); }
+    closeSheet();
+    refreshAlbumView();
   });
 
   let downOnBackdrop = false;
   modal.addEventListener('pointerdown', (e) => { downOnBackdrop = e.target === modal; });
   modal.addEventListener('click', (e) => { if (downOnBackdrop && e.target === modal) closeSheet(); });
+
+  /* ---------------- open album: pins jump out of the folder ---------------- */
+  const av = $id('albumView');
+  const avTitle = av.querySelector('.av-title');
+  const avDesc = av.querySelector('.av-desc');
+  const avGrid = av.querySelector('.av-grid');
+  const avColors = av.querySelector('.av-colors');
+  const avDot = av.querySelector('.av-dot');
+  const avOptions = av.querySelector('.av-options');
+  const avRemove = av.querySelector('.av-remove');
+  let avAlbum = null;
+  let avSave = null;
+  let avTimer = null;
+
+  PALETTE.forEach((p, k) => {
+    const b = document.createElement('button');
+    b.className = 'av-opt';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-label', p.name);
+    b.style.setProperty('--s', p.hex);
+    b.style.setProperty('--k', k);
+    b.dataset.hex = p.hex;
+    avOptions.append(b);
+  });
+
+  const folderCenter = (id) => {
+    const el = views.get(id);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+  const tileHeight = () => (innerWidth <= 720 ? 150 : 210);
+
+  function tileFor(k) {
+    const t = document.createElement('div');
+    t.className = 'av-tile';
+    t.dataset.id = k.id;
+    if (k.type === 'image') {
+      const im = new Image();
+      im.src = srcOf(k);
+      im.alt = k.title || '';
+      im.draggable = false;
+      t.append(im);
+      const H = tileHeight();
+      const ratio = k.iw && k.ih ? k.iw / k.ih : 0.8;
+      t.style.width = `${Math.round(Math.min(Math.max((H - 10) * ratio + 10, 110), H * 1.6))}px`;
+    } else if (k.text) {
+      t.classList.add('note');
+      t.style.background = k.color;
+      t.textContent = k.text;
+    } else {
+      t.classList.add('note', 'link');
+      t.style.background = k.color;
+      t.textContent = hostOf(k.link) || k.title || 'note';
+    }
+    t.addEventListener('click', () => openSheet(k));
+    return t;
+  }
+
+  function fillAlbumView() {
+    const kids = childrenOf(avAlbum.id);
+    avGrid.replaceChildren(...kids.map(tileFor));
+    if (!kids.length) avGrid.innerHTML = '<div class="av-empty"><b>nothing here yet</b>drag pins onto the folder, or drop pictures right on it</div>';
+  }
+  // the name field hugs its text so the tiny color circle sits right next to it
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  function sizeAvTitle() {
+    measureCtx.font = getComputedStyle(avTitle).font;
+    const w = measureCtx.measureText(avTitle.value || avTitle.placeholder).width;
+    avTitle.style.width = `${Math.ceil(Math.min(w + 6, innerWidth * 0.7))}px`;
+  }
+  function setAvColor() {
+    avDot.style.setProperty('--s', avAlbum.color);
+    avOptions.querySelectorAll('.av-opt').forEach((o) => o.setAttribute('aria-checked', String(o.dataset.hex === avAlbum.color)));
+  }
+  const keepFolderDim = () => views.get(avAlbum?.id)?.classList.add('opening');
+
+  function openAlbumView(album) {
+    closeMenu();
+    clearTimeout(avTimer);
+    avAlbum = album;
+    avTitle.value = album.title || '';
+    avDesc.value = album.note || '';
+    setAvColor();
+    avColors.classList.remove('open');
+    delete avRemove.dataset.armed;
+    avRemove.textContent = 'remove album';
+    fillAlbumView();
+    av.hidden = false;
+    av.scrollTop = 0;
+    autosize(avDesc);
+    sizeAvTitle();
+    keepFolderDim();
+
+    const from = folderCenter(album.id);
+    const tiles = [...avGrid.querySelectorAll('.av-tile')];
+    if (from) {
+      tiles.forEach((t, i) => {
+        const r = t.getBoundingClientRect();
+        const dx = from.x - (r.left + r.width / 2);
+        const dy = from.y - (r.top + r.height / 2);
+        const rot = rand(-10, 10).toFixed(1);
+        t.animate([
+          { transform: `translate(${dx}px, ${dy}px) scale(.22) rotate(${rot}deg)`, opacity: 0 },
+          { opacity: 1, offset: 0.3 },
+          { transform: 'none', opacity: 1 },
+        ], { duration: 560, delay: Math.min(i * 45, 450), easing: 'cubic-bezier(.2, 1.3, .35, 1)', fill: 'backwards' });
+      });
+    }
+    requestAnimationFrame(() => av.classList.add('open'));
+  }
+
+  function closeAlbumView() {
+    if (!avAlbum) return;
+    flushAv();
+    const album = avAlbum;
+    avAlbum = null;
+    avColors.classList.remove('open');
+    const to = folderCenter(album.id);
+    const tiles = [...avGrid.querySelectorAll('.av-tile')];
+    if (to) {
+      tiles.forEach((t, i) => {
+        const r = t.getBoundingClientRect();
+        const dx = to.x - (r.left + r.width / 2);
+        const dy = to.y - (r.top + r.height / 2);
+        t.animate([
+          { transform: 'none', opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px) scale(.22)`, opacity: 0 },
+        ], { duration: 320, delay: Math.min((tiles.length - 1 - i) * 22, 220), easing: 'cubic-bezier(.5, 0, .75, 0)', fill: 'forwards' });
+      });
+    }
+    av.classList.remove('open');
+    avTimer = setTimeout(() => {
+      av.hidden = true;
+      avGrid.replaceChildren();
+      views.get(album.id)?.classList.remove('opening');
+      flash(album.id, 'bump');
+    }, to && tiles.length ? 380 : 250);
+  }
+
+  function refreshAlbumView() {
+    if (!avAlbum) return;
+    if (!items.has(avAlbum.id)) { closeAlbumView(); return; }
+    fillAlbumView();
+    keepFolderDim();
+  }
+
+  function avChanged() {
+    render(avAlbum.id);
+    keepFolderDim();
+    clearTimeout(avSave);
+    const a = avAlbum;
+    avSave = setTimeout(() => { avSave = null; persist(a); }, 400);
+  }
+  function flushAv() {
+    if (avSave && avAlbum) { clearTimeout(avSave); avSave = null; persist(avAlbum); }
+  }
+
+  avTitle.addEventListener('input', () => { avAlbum.title = avTitle.value; sizeAvTitle(); avChanged(); });
+  avDesc.addEventListener('input', () => { avAlbum.note = avDesc.value; autosize(avDesc); avChanged(); });
+  avTitle.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); avDesc.focus(); } });
+  avDesc.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); avDesc.blur(); } });
+
+  // the tiny circle pulls out the palette
+  avDot.addEventListener('click', () => avColors.classList.toggle('open'));
+  avOptions.addEventListener('click', (e) => {
+    const o = e.target.closest('.av-opt');
+    if (!o || !avAlbum) return;
+    avAlbum.color = o.dataset.hex;
+    setAvColor();
+    render(avAlbum.id);
+    keepFolderDim();
+    persist(avAlbum);
+    setTimeout(() => avColors.classList.remove('open'), 220);
+  });
+
+  onKeyActivate(avRemove, () => {
+    if (!avRemove.dataset.armed) {
+      avRemove.dataset.armed = '1';
+      avRemove.textContent = 'tap again — pins go back to the board';
+      return;
+    }
+    const a = avAlbum;
+    flushAv();
+    avAlbum = null;
+    av.classList.remove('open');
+    avTimer = setTimeout(() => { av.hidden = true; avGrid.replaceChildren(); }, 250);
+    removeItem(a);
+  });
+
+  const isBlank = (t) => t === av || t.matches?.('.av-grid, .av-head, .av-foot, .av-title-row, .av-empty, .av-empty b');
+  let avDown = false;
+  av.addEventListener('pointerdown', (e) => {
+    avDown = isBlank(e.target);
+    if (!avColors.contains(e.target)) avColors.classList.remove('open');
+  });
+  av.addEventListener('click', (e) => { if (avDown && isBlank(e.target)) closeAlbumView(); });
 
   /* ---------------- account sheet ---------------- */
   const acct = accountModal.querySelector('.acct');
@@ -896,7 +1084,8 @@
     if (e.key !== 'Escape') return;
     closeMenu();
     if (!accountModal.hidden) closeAccount();
-    else closeSheet();
+    else if (current) closeSheet();
+    else closeAlbumView();
   });
 
   /* ---------------- interface for sync.js ---------------- */
@@ -917,6 +1106,7 @@
       render(item.id);
       if (item.type === 'album') childrenOf(item.id).forEach((k) => render(k.id));
       new Set([prev?.album, item.album].filter(Boolean)).forEach((a) => render(a));
+      refreshAlbumView();
       updateHint();
     },
     applyRemoteDelete(id) {
@@ -929,6 +1119,7 @@
       if (item.type === 'album') childrenOf(id).forEach((k) => render(k.id));
       if (item.album) render(item.album);
       if (current?.id === id) closeSheet();
+      refreshAlbumView();
       updateHint();
     },
   };

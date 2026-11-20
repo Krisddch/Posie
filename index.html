@@ -21,7 +21,7 @@
   </main>
 
   <!-- the dark wooden frame around the aluminium board -->
-  <div id="frame" aria-hidden="true"><div class="fv"></div><div class="fh"></div><div class="bevel"></div></div>
+  <div id="frame" aria-hidden="true"><i class="side top"></i><i class="side bottom"></i><i class="side left"></i><i class="side right"></i><i class="bevel"></i></div>
 
   <div class="topbar">
     <button class="wordmark" id="wordmark" aria-label="Account and sync">posie</button>
@@ -43,6 +43,22 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.5v9a2.5 2.5 0 0 0 2.5 2.5h12a2.5 2.5 0 0 0 2.5-2.5v-7A2.5 2.5 0 0 0 18 8h-6.2l-1.8-2.4A1.5 1.5 0 0 0 8.8 5H6a2.5 2.5 0 0 0-2.5 2.5z"/></svg>
       new album
     </button>
+  </div>
+
+  <!-- an open album: its pins jump out over the blurred board -->
+  <div id="albumView" class="album-view" hidden>
+    <div class="av-head">
+      <div class="av-title-row">
+        <input class="av-title" maxlength="80" placeholder="album name" aria-label="Album name">
+        <div class="av-colors">
+          <button class="av-dot current" aria-label="Change album color"></button>
+          <div class="av-options" role="radiogroup" aria-label="Album color"></div>
+        </div>
+      </div>
+      <textarea class="av-desc" rows="1" maxlength="200" placeholder="a short description" aria-label="Album description"></textarea>
+    </div>
+    <div class="av-grid"></div>
+    <div class="av-foot"><span class="av-remove" role="button" tabindex="0">remove album</span></div>
   </div>
 
   <!-- pin / album pop-up -->
