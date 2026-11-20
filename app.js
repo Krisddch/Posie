@@ -646,10 +646,43 @@
 
   function bindSurface(S) {
     const el = S.el;
-    const startPan = (p) => { S.pan = { sx: p.x, sy: p.y, cx: S.cam.x, cy: S.cam.y, moved: false }; };
     const ignore = (t) => t.closest('.card, .ab-head, .ab-foot');
 
+    // a slide keeps gliding after you let go, slowing down naturally
+    let samples = [];
+    let glide = 0;
+    const stopGlide = () => { cancelAnimationFrame(glide); glide = 0; };
+    function startGlide() {
+      const now = performance.now();
+      const recent = samples.filter((p) => now - p.t < 90);
+      samples = [];
+      if (recent.length < 2) return;
+      const a = recent[0];
+      const z = recent[recent.length - 1];
+      const dt = Math.max(z.t - a.t, 8);
+      let vx = (z.x - a.x) / dt;   // px per ms
+      let vy = (z.y - a.y) / dt;
+      if (Math.hypot(vx, vy) < 0.12) return;
+      let last = now;
+      const step = (t) => {
+        const ms = Math.min(t - last, 32);
+        last = t;
+        S.cam.x += vx * ms;
+        S.cam.y += vy * ms;
+        applyCam(S);
+        const k = Math.pow(0.95, ms / 16.7);   // gentle friction
+        vx *= k;
+        vy *= k;
+        glide = Math.hypot(vx, vy) > 0.01 ? requestAnimationFrame(step) : 0;
+      };
+      glide = requestAnimationFrame(step);
+    }
+
+    const startPan = (p) => { S.pan = { sx: p.x, sy: p.y, cx: S.cam.x, cy: S.cam.y, moved: false }; samples = [{ t: performance.now(), ...p }]; };
+    let tapTimer = null;
+
     el.addEventListener('pointerdown', (e) => {
+      stopGlide();
       if (ignore(e.target) || e.button > 0) return;
       el.setPointerCapture(e.pointerId);
       S.pointers.set(e.pointerId, local(e.clientX, e.clientY));
@@ -658,6 +691,7 @@
         const [a, b] = [...S.pointers.values()];
         S.pinch = { d: dist(a, b) || 1, s: S.cam.scale, m: mid(a, b), cx: S.cam.x, cy: S.cam.y };
         S.pan = null;
+        samples = [];
       }
     });
     el.addEventListener('pointermove', (e) => {
@@ -678,23 +712,37 @@
         const dx = lp.x - S.pan.sx;
         const dy = lp.y - S.pan.sy;
         if (!S.pan.moved && Math.hypot(dx, dy) > 4) { S.pan.moved = true; el.classList.add('panning'); }
-        if (S.pan.moved) { S.cam.x = S.pan.cx + dx; S.cam.y = S.pan.cy + dy; applyCam(S); }
+        if (S.pan.moved) {
+          S.cam.x = S.pan.cx + dx;
+          S.cam.y = S.pan.cy + dy;
+          applyCam(S);
+          samples.push({ t: performance.now(), x: lp.x, y: lp.y });
+          if (samples.length > 8) samples.shift();
+        }
       }
     });
     const endPointer = (e) => {
       if (!S.pointers.has(e.pointerId)) return;
       const wasTap = S.pan && !S.pan.moved && !S.pinch && S.pointers.size === 1 && e.type === 'pointerup';
+      const wasSlide = S.pan && S.pan.moved && S.pointers.size === 1 && e.type === 'pointerup';
       S.pointers.delete(e.pointerId);
       if (S.pointers.size < 2) S.pinch = null;
       if (S.pointers.size === 1) startPan([...S.pointers.values()][0]);
       if (S.pointers.size === 0) { S.pan = null; el.classList.remove('panning'); }
+      if (wasSlide) startGlide();
       if (wasTap) {
         const now = performance.now();
         if (now - S.lastTap.t < 350 && Math.hypot(e.clientX - S.lastTap.x, e.clientY - S.lastTap.y) < 30) {
           S.lastTap.t = 0;
+          clearTimeout(tapTimer);
           openMenu(S, e.clientX, e.clientY);
         } else {
           S.lastTap = { t: now, x: e.clientX, y: e.clientY };
+          // on an album board, a single tap on empty space steps back out of the album
+          if (S === sub) {
+            clearTimeout(tapTimer);
+            tapTimer = setTimeout(() => { if (S.lastTap.t === now && menu.hidden) closeAlbum(); }, 360);
+          }
         }
       }
     };
@@ -703,11 +751,13 @@
     el.addEventListener('contextmenu', (e) => {
       if (ignore(e.target)) return;
       e.preventDefault();
+      clearTimeout(tapTimer);
       openMenu(S, e.clientX, e.clientY);
     });
     el.addEventListener('wheel', (e) => {
       if (e.target.closest('.ab-head')) return;
       e.preventDefault();
+      stopGlide();
       closeMenu();
       if (e.ctrlKey || e.metaKey) {
         zoomAt(S, e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
@@ -726,6 +776,7 @@
       zoomAt(S, e.clientX, e.clientY, e.scale / gestureScale);
       gestureScale = e.scale;
     });
+    S.stopGlide = stopGlide;
   }
 
   /* ---------------- an open album: a board of its own ---------------- */
@@ -776,6 +827,7 @@
 
   function showAlbum(album, from) {
     clearTimeout(closeTimer);
+    sub.stopGlide?.();
     sub.views.forEach((el) => el.remove());
     sub.views.clear();
     sub.boardId = album.id;
@@ -1103,6 +1155,7 @@
     if (act === 'signout') window.posie.account?.signOut();
   });
   acct.addEventListener('submit', async (e) => {
+    if (!e.target.classList.contains('acct-email')) return;
     e.preventDefault();
     const form = e.target;
     const note = acct.querySelector('.acct-note');
@@ -1111,10 +1164,31 @@
     form.querySelector('button').disabled = true;
     note.textContent = 'sending…';
     const { error } = await window.posie.account.signInWithEmail(email);
-    note.textContent = error ? `couldn’t send: ${error}` : `check ${email}, then tap the link to sign in ✉︎`;
+    note.textContent = error ? `couldn’t send: ${error}` : `check ${email} and tap the link once, or type the code from the email`;
     note.classList.toggle('error', Boolean(error));
     form.querySelector('button').disabled = false;
+    if (!error && !acct.querySelector('.acct-code')) {
+      const code = document.createElement('form');
+      code.className = 'acct-code';
+      code.innerHTML = '<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="code from the email"><button type="submit">sign in</button>';
+      code.dataset.email = email;
+      note.after(code);
+    }
   });
+  // typed code: works even when the email is opened on another device
+  acct.addEventListener('submit', async (e) => {
+    const form = e.target.closest('.acct-code');
+    if (!form) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const token = form.code.value.replace(/\s/g, '');
+    if (!token || !window.posie.account?.verifyCode) return;
+    const note = acct.querySelector('.acct-note');
+    form.querySelector('button').disabled = true;
+    const { error } = await window.posie.account.verifyCode(form.dataset.email, token);
+    form.querySelector('button').disabled = false;
+    if (error) { note.textContent = `that code didn’t work: ${error}`; note.classList.add('error'); }
+  }, true);
   function openAccount() {
     renderAccount();
     accountModal.hidden = false;
@@ -1183,7 +1257,8 @@
     onChange: (fn) => changeFns.add(fn),
     tombstones: () => new Set(tombs),
     clearTombstone: (id) => { tombs.delete(id); saveTombs(); },
-    accountChanged: () => { if (!accountModal.hidden) renderAccount(); },
+    accountChanged: () => { if (!accountModal.hidden && !acct.querySelector('.acct-code')) renderAccount(); else if (!accountModal.hidden && window.posie.account?.state.user) renderAccount(); },
+    toast: (text) => toast(text),
     // apply a pin/album that changed on another device (no echo back to the cloud)
     applyRemote(item) {
       const prev = items.get(item.id);

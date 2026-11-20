@@ -49,12 +49,29 @@
       });
       return { error: error ? error.message : null };
     },
+    // the same email also carries a 6-digit code (once the template shows it): typing it works on any device
+    async verifyCode(email, token) {
+      if (!sb) return { error: 'sync is not connected yet' };
+      const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+      return { error: error ? error.message : null };
+    },
     async signOut() {
       if (!sb) return;
       await sb.auth.signOut();
       // the board stays on this device; it just stops syncing
     },
   };
+
+  // a sign-in link that failed comes back as #error=…: explain it and tidy the address bar
+  const hashInfo = new URLSearchParams(location.hash.slice(1));
+  if (hashInfo.get('error')) {
+    const code = hashInfo.get('error_code') || '';
+    const msg = code === 'otp_expired'
+      ? 'that sign-in link expired or was already used. Ask for a new one and open it once'
+      : (hashInfo.get('error_description') || 'sign-in didn’t work').replace(/\+/g, ' ');
+    history.replaceState(null, '', location.pathname + location.search);
+    document.addEventListener('posie:ready', () => setTimeout(() => app.toast?.(msg), 300), { once: true });
+  }
 
   if (!state.enabled) return;
 
@@ -228,7 +245,8 @@
   sdkReady = loadScript(SDK)
     .then(() => {
       sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        // implicit flow: a link from the email signs you in on whichever device you open it
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' },
       });
       sb.auth.onAuthStateChange((_event, session) => {
         const user = session?.user ?? null;

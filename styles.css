@@ -63,7 +63,7 @@ button { font: inherit; color: inherit; }
   background-color: #c8cacc;
   background-image:
     /* the soft band of light from the window, fixed like a real reflection */
-    linear-gradient(174deg, rgba(255, 255, 255, 0) 16%, rgba(255, 255, 255, .5) 34%, rgba(255, 255, 255, .16) 47%, rgba(255, 255, 255, 0) 60%, rgba(0, 0, 0, .08) 92%),
+    linear-gradient(176deg, rgba(255, 255, 255, 0) 14%, rgba(255, 255, 255, .45) 32%, rgba(255, 255, 255, .14) 46%, rgba(255, 255, 255, 0) 60%, rgba(0, 0, 0, .08) 92%),
     url("assets/metal.jpg");
   background-size: 100% 100%, calc(512px * var(--z, 1)) calc(512px * var(--z, 1));
   background-position: 0 0, var(--bx, 0) var(--by, 0);
@@ -361,8 +361,8 @@ button { font: inherit; color: inherit; }
   border-radius: 18px;
   /* the main board stays visible, softly blurred, with a hint of the album's color */
   background-color: color-mix(in srgb, var(--c, #f5f0e8) 9%, rgba(250, 247, 241, .4));
-  background-image: radial-gradient(circle, rgba(90, 70, 50, .16) 1px, transparent 1.6px);
-  background-size: calc(26px * var(--z, 1)) calc(26px * var(--z, 1));
+  background-image: radial-gradient(circle, rgba(90, 70, 50, .14) .6px, transparent 1px);
+  background-size: calc(12px * var(--z, 1)) calc(12px * var(--z, 1));
   background-position: var(--bx, 0) var(--by, 0);
   backdrop-filter: blur(5px) saturate(1.05);
   -webkit-backdrop-filter: blur(5px) saturate(1.05);
@@ -846,3 +846,30 @@ button { font: inherit; color: inherit; }
 #account .acct-email input:focus { border-color: #c9c6c1; background: #fff; }
 #account .acct-email button { background: #f1efec; color: #2c2c2c; border: 1px solid #e3e0db; }
 #account .acct-email button:hover:not(:disabled) { background: #e9e6e1; }
+.acct-code { display: flex; gap: 8px; margin-top: 10px; }
+.acct-code input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid #e5e3e0;
+  border-radius: 12px;
+  background: #fafaf9;
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: .12em;
+  color: #2c2c2c;
+  outline: none;
+}
+.acct-code button {
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid #e3e0db;
+  border-radius: 12px;
+  background: #f1efec;
+  color: #2c2c2c;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}

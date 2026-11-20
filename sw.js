@@ -1,6 +1,6 @@
 /* Posie service worker: network first (you always get the newest version online),
  * falling back to the last copy when offline. */
-const CACHE = 'posie-v2';
+const CACHE = 'posie-v3';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'sync.js', 'config.js', 'icon.svg',
   'assets/linen.jpg', 'assets/metal.jpg', 'assets/wood-h.jpg', 'assets/wood-v.jpg'];
 
