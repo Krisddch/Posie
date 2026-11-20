@@ -15,8 +15,8 @@ an **Apple Developer account** (for Sign in with Apple) and a free **Supabase** 
 
 ## 2. Apple (Sign in with Apple)
 
-All of this is at https://developer.apple.com/account → **Certificates, Identifiers & Profiles**.
-Do Supabase step 1 first: you need your project address (`<project>.supabase.co`) below.
+Go straight to https://developer.apple.com/account/resources/identifiers/list (or: developer.apple.com → person icon top-right → **Account** → **Certificates, Identifiers & Profiles**). If you only see "Join the Apple Developer Program", your membership is still being processed (it can take up to 48 hours).
+Do Supabase step 1 first: you need your project address (`arnpmovrwyceifulfmzd.supabase.co`) below.
 
 **a) App ID** (the "app" that owns Sign in with Apple)
 1. **Identifiers** → **+** → **App IDs** → Continue → type **App** → Continue.
@@ -28,8 +28,8 @@ Do Supabase step 1 first: you need your project address (`<project>.supabase.co`
 2. Description: `Posie Web`. Identifier: `com.krisddch.posie.web` → Continue → **Register**.
 3. Open the new Services ID → tick **Sign in with Apple** → **Configure**:
    - Primary App ID: `com.krisddch.posie`
-   - Domains and Subdomains: `<project>.supabase.co`
-   - Return URLs: `https://<project>.supabase.co/auth/v1/callback`
+   - Domains and Subdomains: `arnpmovrwyceifulfmzd.supabase.co`
+   - Return URLs: `https://arnpmovrwyceifulfmzd.supabase.co/auth/v1/callback`
    → **Next** → **Done** → **Continue** → **Save**.
 
 **c) Key** (lets Supabase prove it's you)
