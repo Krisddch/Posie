@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Posie</title>
+  <meta name="description" content="A soft, infinite pin board for the things you love, want, and dream about.">
+  <meta name="theme-color" content="#efe6d8">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="board" aria-label="Your Posie board">
+    <div id="world"></div>
+  </main>
+
+  <div class="wordmark" aria-hidden="true">posie</div>
+
+  <div id="hint" class="hint" hidden>
+    <p class="hint-title">a quiet place for the things you love</p>
+    <p><span>drop a picture anywhere</span> <span>· double-tap to choose one</span> <span>· or just paste</span></p>
+  </div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Pin details">
+      <div class="sheet-media"></div>
+      <div class="sheet-info">
+        <input class="f-title" placeholder="give it a name…" maxlength="120" aria-label="Title">
+        <textarea class="f-note" rows="2" placeholder="why do you love it? what's the plan?" aria-label="Note"></textarea>
+        <div class="f-link-row">
+          <input class="f-link" type="url" inputmode="url" placeholder="add a link to the website…" aria-label="Website link">
+          <a class="f-visit" target="_blank" rel="noopener noreferrer" hidden></a>
+        </div>
+        <div class="sheet-meta">
+          <span class="f-date"></span>
+          <span class="f-remove" role="button" tabindex="0">remove</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="picker" accept="image/*" multiple hidden>
+  <script src="app.js"></script>
+</body>
+</html>
