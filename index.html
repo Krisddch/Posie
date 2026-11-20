@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="linen">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -13,38 +13,70 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script>try { if (localStorage.getItem('posie.theme') === 'metal') document.documentElement.dataset.theme = 'metal'; } catch (e) {}</script>
 </head>
 <body>
   <main id="board" aria-label="Your Posie board">
     <div id="world"></div>
   </main>
 
-  <div class="wordmark" aria-hidden="true">posie</div>
+  <!-- the dark wooden frame around the aluminium board -->
+  <div id="frame" aria-hidden="true"><div class="fv"></div><div class="fh"></div><div class="bevel"></div></div>
+
+  <div class="topbar">
+    <button class="wordmark" id="wordmark" aria-label="Account and sync">posie</button>
+    <button class="theme-dot" id="themeDot" aria-label="Switch board style" title="switch board"></button>
+  </div>
 
   <div id="hint" class="hint" hidden>
     <p class="hint-title">a quiet place for the things you love</p>
-    <p><span>drop a picture anywhere</span> <span>· double-tap to choose one</span> <span>· or just paste</span></p>
+    <p><span>drop a picture anywhere</span> <span>· double-tap to add</span> <span>· or just paste</span></p>
   </div>
 
+  <!-- double-tap menu -->
+  <div id="menu" class="menu" role="menu" hidden>
+    <button role="menuitem" data-act="picture">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="3.5"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l4.5-4.5 3 3 2.5-2.5L19.5 17"/></svg>
+      add a picture
+    </button>
+    <button role="menuitem" data-act="album">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.5v9a2.5 2.5 0 0 0 2.5 2.5h12a2.5 2.5 0 0 0 2.5-2.5v-7A2.5 2.5 0 0 0 18 8h-6.2l-1.8-2.4A1.5 1.5 0 0 0 8.8 5H6a2.5 2.5 0 0 0-2.5 2.5z"/></svg>
+      new album
+    </button>
+  </div>
+
+  <!-- pin / album pop-up -->
   <div id="modal" class="modal" hidden>
-    <div class="sheet" role="dialog" aria-modal="true" aria-label="Pin details">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Details">
       <div class="sheet-media"></div>
       <div class="sheet-info">
-        <input class="f-title" placeholder="give it a name…" maxlength="120" aria-label="Title">
-        <textarea class="f-note" rows="2" placeholder="why do you love it? what's the plan?" aria-label="Note"></textarea>
+        <span class="f-back" role="button" tabindex="0" hidden></span>
+        <input class="f-title" maxlength="120" aria-label="Name">
+        <textarea class="f-note" rows="2" aria-label="Description"></textarea>
+        <div class="f-swatches" role="radiogroup" aria-label="Album color" hidden></div>
         <div class="f-link-row">
           <input class="f-link" type="url" inputmode="url" placeholder="add a link to the website…" aria-label="Website link">
           <a class="f-visit" target="_blank" rel="noopener noreferrer" hidden></a>
         </div>
         <div class="sheet-meta">
           <span class="f-date"></span>
-          <span class="f-remove" role="button" tabindex="0">remove</span>
+          <span class="meta-actions">
+            <span class="f-out" role="button" tabindex="0" hidden>take out of album</span>
+            <span class="f-remove" role="button" tabindex="0">remove</span>
+          </span>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- account / sync -->
+  <div id="account" class="modal" hidden>
+    <div class="acct" role="dialog" aria-modal="true" aria-label="Account"></div>
+  </div>
+
   <input type="file" id="picker" accept="image/*" multiple hidden>
+  <script src="config.js"></script>
   <script src="app.js"></script>
+  <script src="sync.js"></script>
 </body>
 </html>
