@@ -4,6 +4,6 @@
  */
 window.POSIE_CONFIG = {
   supabaseUrl: 'https://arnpmovrwyceifulfmzd.supabase.co',
-  supabaseAnonKey: '',  // Project Settings → API Keys → anon / publishable key
+  supabaseAnonKey: 'sb_publishable_7dPUhUv-WNGArWADsMb8Aw_QSLoo_Bv',  // public by design; RLS keeps boards private
   appleSignIn: false,   // turn on once Sign in with Apple is set up (needs the paid Apple Developer Program)
 };

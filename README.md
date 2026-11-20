@@ -7,13 +7,16 @@ a digital moodboard so ideas don't slip away.
 
 - **Infinite linen board.** Drag the background to move around. Pinch, or ⌘/Ctrl + scroll, to zoom; the fabric grows and shrinks with you.
 - **No buttons.** Drop a picture anywhere or paste one. **Double-tap** (or right-click) the board for a tiny menu: **add a picture** or **new album**.
-- **Albums** look like folders with their pictures peeking out. Each has a name, a short description and a color
-  (sky `#75A1EE`, butter `#FDE575`, blossom `#F890C5`, cocoa `#733D20`). Drag a pin onto a folder to file it, or drop pictures straight onto it.
-  Tap a folder to see what's inside; tap a pin inside to open it, or take it back out.
+- **Albums** are real-looking folders: a tab, papers tucked inside, and a thumb cut on the right where you can peek at what's inside.
+  A tiny number shows how many things are in it. Drag a pin onto a folder to file it, or drop pictures straight onto it.
+  **Tap a folder and it becomes a board of its own**: the pins flow out onto a board you can move and zoom like the main one,
+  over the softly blurred main board. Albums can hold albums. Rename it, change its color with the tiny circle, or go back with "← all ideas".
+  The main board is for unsorted ideas.
 - **Tap a pin** to open it in the middle: a name, a note and a link to the website it came from.
 - **The little aluminium circle** next to the name turns the board into brushed aluminium in a dark wooden frame, with colorful ceramic magnets.
   Tap it again to go back to linen.
-- **Sign in with Apple** (tap **posie**) syncs your board between devices. It needs a one-time setup: see [SETUP.md](SETUP.md).
+- **Sync**: tap **posie** and sign in with an email link (free) to keep your board on all your devices. See [SETUP.md](SETUP.md).
+- **Share to Posie** from Pinterest and other apps: see [SHARE.md](SHARE.md).
 - Without an account everything is saved in your browser and works offline.
 
 ## Run it locally

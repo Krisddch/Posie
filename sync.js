@@ -11,7 +11,7 @@
 (() => {
   'use strict';
 
-  const SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+  const SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';
   const cfg = window.POSIE_CONFIG || {};
   const app = window.posie;
   if (!app) return;
