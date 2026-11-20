@@ -13,6 +13,9 @@ create table if not exists public.pins (
 
 alter table public.pins enable row level security;
 
+-- newer projects don't expose new tables automatically: let signed-in people use it (RLS still limits them to their own rows)
+grant select, insert, update, delete on public.pins to authenticated;
+
 create policy "pins: read own"   on public.pins for select using (auth.uid() = user_id);
 create policy "pins: add own"    on public.pins for insert with check (auth.uid() = user_id);
 create policy "pins: change own" on public.pins for update using (auth.uid() = user_id) with check (auth.uid() = user_id);

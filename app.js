@@ -476,7 +476,9 @@
   const offset = (at, i) => ({ x: at.x + i * 38, y: at.y + i * 30 });
 
   async function ingest(dt, at, extra = {}) {
-    const files = [...(dt.files || [])].filter((f) => f.type.startsWith('image/') || /\.(heic|heif|avif|webp)$/i.test(f.name));
+    let files = [...(dt.files || [])];
+    if (!files.length && dt.items) files = [...dt.items].filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean);
+    files = files.filter((f) => f.type.startsWith('image/') || /\.(heic|heif|avif|webp)$/i.test(f.name || ''));
     const html = dt.getData('text/html') || '';
     const uri = (dt.getData('text/uri-list') || '').split(/\r?\n/).find((l) => l && !l.startsWith('#')) || '';
     const text = (dt.getData('text/plain') || '').trim();
@@ -569,12 +571,40 @@
     if (!act) return;
     closeMenu();
     if (act === 'picture') openPicker(menuAt, menuBoard);
+    if (act === 'paste') pasteFromClipboard(menuAt, menuBoard);
     if (act === 'album') {
       const a = create({ type: 'album', album: menuBoard }, menuAt);
       openSheet(a, { focusTitle: true });
     }
   });
   window.addEventListener('pointerdown', (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
+
+  async function pasteFromClipboard(at, boardId) {
+    const extra = { album: boardId };
+    const textOnly = (text) => ({ files: [], items: null, getData: (t) => (t === 'text/plain' ? text : '') });
+    try {
+      if (navigator.clipboard?.read) {
+        const list = await navigator.clipboard.read();
+        let i = 0;
+        for (const entry of list) {
+          const type = entry.types.find((t) => t.startsWith('image/'));
+          if (type) { await addImageBlob(await entry.getType(type), offset(at, i++), extra); continue; }
+          if (entry.types.includes('text/plain')) {
+            const text = await (await entry.getType('text/plain')).text();
+            if (text.trim()) { await ingest(textOnly(text), offset(at, i++), extra); }
+          }
+        }
+        if (!i) toast('nothing to paste yet. Copy a picture or a link first');
+        return;
+      }
+      const text = await navigator.clipboard?.readText?.();
+      if (text?.trim()) ingest(textOnly(text), at, extra);
+      else toast('nothing to paste yet. Copy a picture or a link first');
+    } catch (e) {
+      console.warn('posie: clipboard', e);
+      toast('allow “Paste” when your browser asks, or press ⌘V');
+    }
+  }
 
   let pickAt = { x: 0, y: 0 };
   let pickBoard = null;
@@ -1164,31 +1194,10 @@
     form.querySelector('button').disabled = true;
     note.textContent = 'sending…';
     const { error } = await window.posie.account.signInWithEmail(email);
-    note.textContent = error ? `couldn’t send: ${error}` : `check ${email} and tap the link once, or type the code from the email`;
+    note.textContent = error ? `couldn’t send: ${error}` : `check ${email} and tap the link once, on this device ✉︎`;
     note.classList.toggle('error', Boolean(error));
     form.querySelector('button').disabled = false;
-    if (!error && !acct.querySelector('.acct-code')) {
-      const code = document.createElement('form');
-      code.className = 'acct-code';
-      code.innerHTML = '<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="code from the email"><button type="submit">sign in</button>';
-      code.dataset.email = email;
-      note.after(code);
-    }
   });
-  // typed code: works even when the email is opened on another device
-  acct.addEventListener('submit', async (e) => {
-    const form = e.target.closest('.acct-code');
-    if (!form) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    const token = form.code.value.replace(/\s/g, '');
-    if (!token || !window.posie.account?.verifyCode) return;
-    const note = acct.querySelector('.acct-note');
-    form.querySelector('button').disabled = true;
-    const { error } = await window.posie.account.verifyCode(form.dataset.email, token);
-    form.querySelector('button').disabled = false;
-    if (error) { note.textContent = `that code didn’t work: ${error}`; note.classList.add('error'); }
-  }, true);
   function openAccount() {
     renderAccount();
     accountModal.hidden = false;
@@ -1257,7 +1266,7 @@
     onChange: (fn) => changeFns.add(fn),
     tombstones: () => new Set(tombs),
     clearTombstone: (id) => { tombs.delete(id); saveTombs(); },
-    accountChanged: () => { if (!accountModal.hidden && !acct.querySelector('.acct-code')) renderAccount(); else if (!accountModal.hidden && window.posie.account?.state.user) renderAccount(); },
+    accountChanged: () => { if (!accountModal.hidden) renderAccount(); },
     toast: (text) => toast(text),
     // apply a pin/album that changed on another device (no echo back to the cloud)
     applyRemote(item) {

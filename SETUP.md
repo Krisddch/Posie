@@ -13,8 +13,7 @@ Signing in by **email link** is free and works as soon as Supabase is set up.
 4. **Authentication → URL Configuration** (important, otherwise sign-in links go to `localhost:3000`):
    - Site URL: `https://krisddch.github.io/Posie/`
    - Redirect URLs: add `https://krisddch.github.io/Posie/**` and `http://localhost:5173/**`
-5. Optional, recommended: **Authentication → Emails → Magic Link**, add this line to the email body so you can also type a code
-   (handy when the email arrives on another device): `<p>Or type this code in Posie: <b>{{ .Token }}</b></p>`
+5. If you ran the SQL before November 2026's update, also run: `grant select, insert, update, delete on public.pins to authenticated;`
 
 Email sign-in now works (Supabase sends the emails; the free plan allows a few per hour, plenty for personal use).
 For one-tap sharing from Pinterest, also deploy the link-preview function: see [SHARE.md](SHARE.md).
