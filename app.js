@@ -49,19 +49,27 @@
       const c = JSON.parse(localStorage.getItem('posie.cam'));
       if (c && [c.x, c.y, c.scale].every(Number.isFinite)) return c;
     } catch {}
-    return { x: innerWidth / 2, y: innerHeight / 2, scale: 1 };
+    return { x: board.clientWidth / 2, y: board.clientHeight / 2, scale: 1 };
   })();
+
+  // The board sits inset on the "wall", so screen points are converted to board-local ones.
+  let origin = { x: 0, y: 0 };
+  const measure = () => { const r = board.getBoundingClientRect(); origin = { x: r.left, y: r.top }; };
+  measure();
+  window.addEventListener('resize', measure);
+  const local = (px, py) => ({ x: px - origin.x, y: py - origin.y });
 
   let camTimer;
   function applyCam() {
     world.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.scale})`;
     // the linen moves with you, so the board feels like one endless piece of fabric
-    board.style.backgroundPosition = `${cam.x}px ${cam.y}px, ${cam.x}px ${cam.y}px, ${cam.x}px ${cam.y}px, 0 0`;
+    board.style.backgroundPosition = `${cam.x}px ${cam.y}px`;
     clearTimeout(camTimer);
     camTimer = setTimeout(() => { try { localStorage.setItem('posie.cam', JSON.stringify(cam)); } catch {} }, 300);
   }
   const clampScale = (s) => Math.min(3, Math.max(0.15, s));
-  function zoomAt(px, py, factor) {
+  function zoomAt(cx, cy, factor) {
+    const { x: px, y: py } = local(cx, cy);
     const s = clampScale(cam.scale * factor);
     const k = s / cam.scale;
     cam.x = px - (px - cam.x) * k;
@@ -69,7 +77,7 @@
     cam.scale = s;
     applyCam();
   }
-  const toWorld = (px, py) => ({ x: (px - cam.x) / cam.scale, y: (py - cam.y) / cam.scale });
+  const toWorld = (cx, cy) => { const p = local(cx, cy); return { x: (p.x - cam.x) / cam.scale, y: (p.y - cam.y) / cam.scale }; };
 
   /* ---------------- pins ---------------- */
   const pins = new Map(); // id -> { item, el, url }
@@ -344,14 +352,15 @@
   board.addEventListener('pointerdown', (e) => {
     if (e.target.closest('.card') || e.button > 0) return;
     board.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size === 1) startPan({ x: e.clientX, y: e.clientY });
+    pointers.set(e.pointerId, local(e.clientX, e.clientY));
+    if (pointers.size === 1) startPan(local(e.clientX, e.clientY));
     else if (pointers.size === 2) startPinch();
   });
 
   board.addEventListener('pointermove', (e) => {
     if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const lp = local(e.clientX, e.clientY);
+    pointers.set(e.pointerId, lp);
     if (pinch && pointers.size >= 2) {
       const [a, b] = [...pointers.values()];
       const m = mid(a, b);
@@ -363,8 +372,8 @@
       cam.scale = s;
       applyCam();
     } else if (pan) {
-      const dx = e.clientX - pan.sx;
-      const dy = e.clientY - pan.sy;
+      const dx = lp.x - pan.sx;
+      const dy = lp.y - pan.sy;
       if (!pan.moved && Math.hypot(dx, dy) > 4) { pan.moved = true; board.classList.add('panning'); }
       if (pan.moved) {
         cam.x = pan.cx + dx;

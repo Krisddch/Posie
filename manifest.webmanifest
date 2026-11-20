@@ -4,7 +4,7 @@
   "description": "A soft, infinite pin board for the things you love, want, and dream about.",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#efe6d8",
-  "theme_color": "#efe6d8",
+  "background_color": "#fbf9f5",
+  "theme_color": "#fbf9f5",
   "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
 }

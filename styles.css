@@ -1,5 +1,7 @@
 :root {
-  --linen: #efe6d8;
+  --linen: #f5f0e8;
+  --wall: #fbf9f5;
+  --gap: 14px;
   --ink: #4f4134;
   --ink-soft: #8a7866;
   --paper: #fffdf8;
@@ -14,7 +16,7 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--linen);
+  background: var(--wall);
   color: var(--ink);
   font-family: Inter, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -25,24 +27,22 @@ html, body {
 /* ---------- the board: an infinite piece of linen ---------- */
 #board {
   position: fixed;
-  inset: 0;
+  inset: max(var(--gap), env(safe-area-inset-top)) max(var(--gap), env(safe-area-inset-right))
+         max(var(--gap), env(safe-area-inset-bottom)) max(var(--gap), env(safe-area-inset-left));
   overflow: hidden;
   touch-action: none;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
+  border-radius: 18px;
   background-color: var(--linen);
-  background-image:
-    /* soft fibre noise */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .33 0 0 0 0 .22 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.32'/%3E%3C/svg%3E"),
-    /* horizontal weft threads */
-    repeating-linear-gradient(0deg, rgba(120, 92, 58, .055) 0 1px, transparent 1px 3px),
-    /* vertical warp threads */
-    repeating-linear-gradient(90deg, rgba(120, 92, 58, .045) 0 1px, transparent 1px 4px),
-    /* gentle light falloff */
-    radial-gradient(ellipse at 50% 40%, rgba(255, 252, 245, .35), transparent 70%);
-  background-size: 240px 240px, 3px 3px, 4px 4px, 100% 100%;
-  background-attachment: local;
+  background-image: url("assets/linen.jpg");
+  background-size: 300px 300px;
+  /* a canvas hung on the wall: soft drop shadow + a whisper of an edge */
+  box-shadow:
+    0 0 0 1px rgba(120, 96, 66, .07),
+    0 2px 6px rgba(90, 66, 40, .06),
+    0 18px 40px -22px rgba(90, 66, 40, .28);
 }
 #board.panning { cursor: grabbing; }
 #board.dropping::after {
@@ -87,14 +87,14 @@ html, body {
 .card.image {
   background: var(--paper);
   padding: 7px;
-  border-radius: 4px;
+  border-radius: 16px;
   box-shadow: var(--shadow);
 }
 .card.image img {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 2px;
+  border-radius: 10px;
   background: #ece2d2;
   object-fit: cover;
   pointer-events: none;
@@ -128,7 +128,7 @@ html, body {
 .card.note {
   min-height: 170px;
   padding: 18px 18px 20px;
-  border-radius: 3px;
+  border-radius: 14px;
   box-shadow: var(--shadow);
   font-family: Caveat, cursive;
   font-size: 25px;
@@ -141,8 +141,8 @@ html, body {
 /* ---------- chrome ---------- */
 .wordmark {
   position: fixed;
-  top: max(18px, env(safe-area-inset-top));
-  left: 22px;
+  top: calc(max(var(--gap), env(safe-area-inset-top)) + 16px);
+  left: calc(max(var(--gap), env(safe-area-inset-left)) + 22px);
   font-family: "Instrument Serif", Georgia, serif;
   font-style: italic;
   font-size: 28px;
@@ -219,7 +219,7 @@ html, body {
   max-width: 100%;
   max-height: calc(100dvh - 80px);
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: 14px;
   box-shadow: 0 6px 22px -10px rgba(50, 32, 14, .4);
 }
 .sheet-media .f-text {
@@ -303,6 +303,8 @@ html, body {
 .f-remove:hover, .f-remove[data-armed] { color: #b4553f; }
 
 @media (max-width: 720px) {
+  :root { --gap: 8px; }
+  #board { border-radius: 14px; }
   .sheet { flex-direction: column; overflow-y: auto; }
   .sheet-media { flex: none; padding: 16px; }
   .sheet-media img { max-height: 56dvh; }
